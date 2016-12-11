@@ -66,31 +66,26 @@ decodeIntoList reversedBinary = x : decodeIntoList nextEncoding
 decodeProgram :: Integer -> [Instruction]
 decodeProgram x = map decodeBody (reverse $ decodeIntoList (toBinary x))
 
--- Busy beaver
 --        contentsOf( r0    ,    r1  )                    newR0     newR1   nextLabel
-runBBInstruction :: (Integer, Integer) -> Instruction -> (Integer, Integer, Integer)
-runBBInstruction (r0, r1) (PlusReg 0 l) = (r0 + 1, r1, l)
-runBBInstruction (r0, r1) (PlusReg 1 l) = (r0, r1 + 1, l)
+runOnTwoState :: (Integer, Integer) -> Instruction -> (Integer, Integer, Integer)
+runOnTwoState (r0, r1) (PlusReg 0 l) = (r0 + 1, r1, l)
+runOnTwoState (r0, r1) (PlusReg 1 l) = (r0, r1 + 1, l)
 
-runBBInstruction (0, r1) (MinusReg 0 success fail) = (0, r1, fail)
-runBBInstruction (r0, 0) (MinusReg 1 success fail) = (r0, 0, fail)
-runBBInstruction (r0, r1) (MinusReg 0 success fail) = (r0 - 1, r1, success)
-runBBInstruction (r0, r1) (MinusReg 1 success fail) = (r0, r1 - 1, success)
+runOnTwoState (0, r1) (MinusReg 0 success fail) = (0, r1, fail)
+runOnTwoState (r0, 0) (MinusReg 1 success fail) = (r0, 0, fail)
+runOnTwoState (r0, r1) (MinusReg 0 success fail) = (r0 - 1, r1, success)
+runOnTwoState (r0, r1) (MinusReg 1 success fail) = (r0, r1 - 1, success)
 
--- label -1 used to indicate failure
-runBBInstruction (r0, r1) HALT  = (r0, r1, -1)
+runOnTwoState (r0, r1) HALT  = (r0, r1, -1)
 
-runBusyBeaver :: [Instruction] -> (Integer, Integer)
-runBusyBeaver instructions = runTwoState (0, 0) instructions
+runTwoSymbol :: (Integer, Integer) -> [Instruction] -> (Integer, Integer)
+runTwoSymbol (r0, r1) instructions = runTwoSymbol' (r0, r1) (head instructions) instructions
 
-runTwoState :: (Integer, Integer) -> [Instruction] -> (Integer, Integer)
-runTwoState (r0, r1) instructions = runTwoState' (r0, r1) (head instructions) instructions
-
-runTwoState' :: (Integer, Integer) -> Instruction -> [Instruction] -> (Integer, Integer)
-runTwoState' (r0, r1) HALT instructions = (r0, r1)
-runTwoState' (r0, r1) currentInstruction instructions = runTwoState' (nextR0, nextR1) nextInstruction instructions
+runTwoSymbol' :: (Integer, Integer) -> Instruction -> [Instruction] -> (Integer, Integer)
+runTwoSymbol' (r0, r1) HALT instructions = (r0, r1)
+runTwoSymbol' (r0, r1) currentInstruction instructions = runTwoSymbol' (nextR0, nextR1) nextInstruction instructions
   where
-    (nextR0, nextR1, nextLabel) = runBBInstruction (r0, r1) currentInstruction
+    (nextR0, nextR1, nextLabel) = runOnTwoState (r0, r1) currentInstruction
     nextInstruction = instructionFromLabel nextLabel instructions
 
 instructionFromLabel :: Integer -> [Instruction] -> Instruction
@@ -99,3 +94,16 @@ instructionFromLabel label instructions
   | (fromIntegral label) >= (length instructions) = HALT
   | otherwise                      = instructions !! (fromIntegral label)
 
+runBusyBeaver :: [Instruction] -> Integer
+runBusyBeaver instructions = fst (runTwoSymbol (0, 0) instructions)
+
+-- A bbnkMachine computes nk with (n + k) instructions
+
+bb1nMachine :: Integer -> [Instruction]
+bb1nMachine n = (map (\x -> PlusReg 0 x) [1..n]) ++ [MinusReg 1 (n + 1) (n + 1)]
+
+bb2nMachine :: Integer -> [Instruction]
+bb2nMachine n = [PlusReg 1 1] ++ (map (\x -> PlusReg 0 (x + 1)) [1..n]) ++ [MinusReg 1 1 (2 * n + 1)]
+
+bb3nMachine :: Integer -> [Instruction]
+bb3nMachine n = [PlusReg 1 1, PlusReg 1 2] ++ (map (\x -> PlusReg 0 (x + 2)) [1..n]) ++ [MinusReg 1 2 (n + 3)]
