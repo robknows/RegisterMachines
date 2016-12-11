@@ -65,3 +65,32 @@ decodeIntoList reversedBinary = x : decodeIntoList nextEncoding
 
 decodeProgram :: Integer -> [Instruction]
 decodeProgram x = map decodeBody (reverse $ decodeIntoList (toBinary x))
+
+-- Busy beaver
+--        contentsOf( r0    ,    r1  )                    newR0     newR1   nextLabel
+runBBInstruction :: (Integer, Integer) -> Instruction -> (Integer, Integer, Integer)
+runBBInstruction (r0, r1) (PlusReg 0 l) = (r0 + 1, r1, l)
+runBBInstruction (r0, r1) (PlusReg 1 l) = (r0, r1 + 1, l)
+
+runBBInstruction (0, r1) (MinusReg 0 success fail) = (0, r1, fail)
+runBBInstruction (r0, 0) (MinusReg 1 success fail) = (r0, 0, fail)
+runBBInstruction (r0, r1) (MinusReg 0 success fail) = (r0 - 1, r1, success)
+runBBInstruction (r0, r1) (MinusReg 1 success fail) = (r0, r1 - 1, success)
+
+-- label -1 used to indicate failure
+runBBInstruction (r0, r1) HALT  = (r0, r1, -1)
+
+runBusyBeaver :: (Integer, Integer) -> [Instruction] -> (Integer, Integer)
+runBusyBeaver (r0, r1) instructions = runBB' (r0, r1) (head instructions) instructions
+
+runBB' :: (Integer, Integer) -> Instruction -> [Instruction] -> (Integer, Integer)
+runBB' (r0, r1) HALT instructions = (r0, r1)
+runBB' (r0, r1) currentInstruction instructions = runBB' (nextR0, nextR1) nextInstruction instructions
+  where
+    (nextR0, nextR1, nextLabel) = runBBInstruction (r0, r1) currentInstruction
+    nextInstruction = instructionFromLabel nextLabel instructions
+
+instructionFromLabel :: Integer -> [Instruction] -> Instruction
+instructionFromLabel (-1) instructions  = HALT
+instructionFromLabel label instructions = instructions !! (fromIntegral label)
+
